@@ -798,7 +798,11 @@ mod tests {
             selected.contains("CREATE TABLE"),
             "a drag over the preview should select the script, selected {selected:?}"
         );
-        cx.simulate_keystrokes("ctrl-c");
+        if cfg!(target_os = "macos") {
+            cx.simulate_keystrokes("cmd-c");
+        } else {
+            cx.simulate_keystrokes("ctrl-c");
+        }
         let copied = cx
             .update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()))
             .unwrap_or_default();

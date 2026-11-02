@@ -749,14 +749,21 @@ pub fn sanitize_file_stem(table: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn temp_file(extension: &str) -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("rustgrid-export-{unique}.{extension}"))
+        let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let pid = std::process::id();
+        std::env::temp_dir().join(format!(
+            "rustgrid-export-{pid}-{unique}-{count}.{extension}"
+        ))
     }
 
     fn columns() -> Vec<String> {

@@ -175,7 +175,8 @@ fn builtin_registry() -> DriverRegistry {
         .with(Arc::new(rustgrid_sqlserver::SqlServerDriver::new()))
         .with(Arc::new(rustgrid_postgresql::PostgresDriver::new()))
         .with(Arc::new(rustgrid_oracle::OracleDriver::new()))
-        .with(Arc::new(rustgrid_redis::RedisDriver::new()));
+        .with(Arc::new(rustgrid_redis::RedisDriver::new()))
+        .with(Arc::new(rustgrid_infinity::InfinityDriver::new()));
     #[cfg(feature = "driver-odbc")]
     let drivers = drivers.with(Arc::new(rustgrid_odbc::OdbcDriver::new()));
     registry.register_source(&drivers);

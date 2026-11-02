@@ -1,0 +1,23 @@
+[package]
+name = "rustgrid-infinity"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rustgrid-core.workspace = true
+rustgrid-tunnel.workspace = true
+tokio = { workspace = true, features = ["net", "io-util"] }
+async-trait.workspace = true
+tracing.workspace = true
+sqlparser.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

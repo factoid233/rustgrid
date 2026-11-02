@@ -11,6 +11,7 @@ members = [
     "crates/rustgrid-postgresql",
     "crates/rustgrid-oracle",
     "crates/rustgrid-redis",
+    "crates/rustgrid-infinity",
     "crates/rustgrid-tunnel",
     "crates/rustgrid-odbc",
     "crates/rustgrid-config",
@@ -40,6 +41,7 @@ rustgrid-oracle = { path = "crates/rustgrid-oracle" }
 rustgrid-tunnel = { path = "crates/rustgrid-tunnel" }
 rustgrid-odbc = { path = "crates/rustgrid-odbc" }
 rustgrid-redis = { path = "crates/rustgrid-redis" }
+rustgrid-infinity = { path = "crates/rustgrid-infinity" }
 rustgrid-config = { path = "crates/rustgrid-config" }
 
 async-trait = "0.1"

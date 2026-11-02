@@ -7371,6 +7371,7 @@ dependencies = [
  "rustgrid-core",
  "rustgrid-export",
  "rustgrid-import",
+ "rustgrid-infinity",
  "rustgrid-mysql",
  "rustgrid-odbc",
  "rustgrid-oracle",
@@ -7447,6 +7448,22 @@ dependencies = [
  "encoding_rs",
  "rustgrid-core",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "rustgrid-infinity"
+version = "0.1.4"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "rustgrid-core",
+ "rustgrid-tunnel",
+ "serde",
+ "serde_json",
+ "sqlparser",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
