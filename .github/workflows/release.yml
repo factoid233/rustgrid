@@ -60,23 +60,23 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             platform: windows-x64
-          - os: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            platform: windows-arm64
-          - os: macos-15
-            target: aarch64-apple-darwin
-            platform: macos-arm64
+          # - os: windows-11-arm
+          #   target: aarch64-pc-windows-msvc
+          #   platform: windows-arm64
+          # - os: macos-15
+          #   target: aarch64-apple-darwin
+          #   platform: macos-arm64
           # Cross-compiled from the same arm64 runner; see the header note. The x86_64 std is
           # installed by the `Install Rust` step below.
           - os: macos-15
             target: x86_64-apple-darwin
             platform: macos-x64
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            platform: linux-x64
-          - os: ubuntu-22.04-arm
-            target: aarch64-unknown-linux-gnu
-            platform: linux-arm64
+          # - os: ubuntu-22.04
+          #   target: x86_64-unknown-linux-gnu
+          #   platform: linux-x64
+          # - os: ubuntu-22.04-arm
+          #   target: aarch64-unknown-linux-gnu
+          #   platform: linux-arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -153,7 +153,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
+          $ver = ($env:GITHUB_REF_NAME -replace '^v', '') -replace '[/\\]', '-'
           $name = "RustGrid-$ver-${{ matrix.platform }}.zip"
           Compress-Archive -Path "target/${{ matrix.target }}/release/RustGrid.exe" -DestinationPath $name
 
@@ -162,12 +162,13 @@ jobs:
         run: |
           set -eu
           ver="${GITHUB_REF_NAME#v}"
+          ver="${ver//\//-}"
           name="RustGrid-${ver}-${{ matrix.platform }}.tar.gz"
           app="dist/RustGrid.app"
           rm -rf dist
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           cp "target/${{ matrix.target }}/release/RustGrid" "$app/Contents/MacOS/RustGrid"
-          sed "s/@VERSION@/${ver}/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+          sed "s|@VERSION@|${ver}|g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           sh packaging/macos/make-icns.sh crates/rustgrid-app/assets/logo.png \
             "$app/Contents/Resources/AppIcon.icns"
           # Fail on a malformed property list or a missing icon rather than shipping a bundle
@@ -185,6 +186,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           ver="${GITHUB_REF_NAME#v}"
+          ver="${ver//\//-}"
           name="RustGrid-${ver}-${{ matrix.platform }}.tar.gz"
           tar -czf "$name" -C "target/${{ matrix.target }}/release" RustGrid
           ls -lh "$name"
