@@ -58,8 +58,6 @@ struct TreeDatabase {
     opened_schemas: BTreeSet<String>,
     /// The key-value namespaces (Redis key prefixes) under this database.
     namespaces: Loadable<Vec<rustgrid_core::ObjectNamespace>>,
-    /// The namespace filter currently applied to the key list.
-    object_pattern: Option<String>,
 }
 
 #[derive(Clone)]
@@ -253,7 +251,6 @@ fn snapshot_connections(app: &AppView) -> Vec<TreeConnection> {
                                         Loadable::Loaded(namespaces.clone())
                                     }
                                 },
-                                object_pattern: database.object_pattern.clone(),
                             }
                         })
                         .collect(),
@@ -1311,12 +1308,14 @@ impl TreePane {
                         "keys-{connection_index}-{database_index}-{}",
                         namespace.name
                     );
-                    let selected =
-                        database.object_pattern.as_deref() == Some(namespace.name.as_str());
+                    let selected = self.selected.as_deref() == Some(id.as_str());
                     let name = namespace.name.clone();
                     let label = format!("{name}*");
                     let clicked = namespace.name.clone();
                     let row_app = app.clone();
+                    let menu_app = app.clone();
+                    let menu_id = id.clone();
+                    let menu_namespace = namespace.name.clone();
                     let nav_app = app.clone();
                     let nav_id = id.clone();
                     let nav_name = label.clone();
@@ -1347,15 +1346,42 @@ impl TreePane {
                             window.focus(&this.focus, cx);
                             this.selected = Some(id.clone());
                             let name = clicked.clone();
-                            let _ = row_app.update(cx, |app, cx| {
-                                app.select_key_namespace(
-                                    connection_index,
-                                    database_index,
-                                    Some(name),
-                                    cx,
-                                );
+                            let app = row_app.clone();
+                            // `select_key_namespace` updates the tree pane (to keep the selected
+                            // row in step), so running it from inside this row's listener would
+                            // borrow the tree a second time and abort the app. Defer one cycle,
+                            // exactly like the saved-query and backup leaves do.
+                            cx.defer(move |cx| {
+                                let _ = app.update(cx, |app, cx| {
+                                    app.select_key_namespace(
+                                        connection_index,
+                                        database_index,
+                                        Some(name),
+                                        cx,
+                                    );
+                                });
                             });
                         }))
+                        .on_mouse_down(
+                            MouseButton::Right,
+                            cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                                cx.stop_propagation();
+                                this.selected_table = None;
+                                this.selected = Some(menu_id.clone());
+                                let _ = menu_app.update(cx, |app, cx| {
+                                    app.context_menu = Some(ContextMenu {
+                                        target: ContextTarget::KeyNamespace {
+                                            connection_index,
+                                            database_index,
+                                            namespace: menu_namespace.clone(),
+                                        },
+                                        position: event.position,
+                                    });
+                                    cx.notify();
+                                });
+                                cx.notify();
+                            }),
+                        )
                         .child(tree_icon("icons/folder.svg", theme.warning))
                         .child(
                             div()
@@ -1373,13 +1399,19 @@ impl TreePane {
                         );
                     let nav_row =
                         NavRow::new(nav_id, nav_name).opens(Rc::new(move |_this, _window, cx| {
-                            let _ = nav_app.update(cx, |app, cx| {
-                                app.select_key_namespace(
-                                    connection_index,
-                                    database_index,
-                                    Some(nav_pick.clone()),
-                                    cx,
-                                );
+                            let app = nav_app.clone();
+                            let pick = nav_pick.clone();
+                            // Enter on a namespace row goes through the same app path as a
+                            // click; defer it out of the tree's own listener (see above).
+                            cx.defer(move |cx| {
+                                let _ = app.update(cx, |app, cx| {
+                                    app.select_key_namespace(
+                                        connection_index,
+                                        database_index,
+                                        Some(pick.clone()),
+                                        cx,
+                                    );
+                                });
                             });
                         }));
                     sub = sub.child(self.nav_row(row, nav_row));
@@ -2762,7 +2794,7 @@ impl Render for TreePane {
             // and clicking its track jumps there.
             .child(
                 Scrollbar::vertical(&self.scroll)
-                    .mode(ScrollbarMode::Always)
+                    .mode(ScrollbarMode::Scrolling)
                     .id("sidebar-scrollbar"),
             );
         let app = self.app.clone();

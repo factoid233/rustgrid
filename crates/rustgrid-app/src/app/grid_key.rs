@@ -121,8 +121,16 @@ impl GridView {
         let collection = add_label.is_some();
         let delete_enabled =
             editable && collection && self.state.selection.is_some() && !self.state.rows.is_empty();
+        // The editor is the source of truth for a string key: a keystroke reflected there but not
+        // yet in the mirrored `key_string_dirty` must still enable 保存修改.
+        let string_dirty = self.is_string_key_page()
+            && self.key_string_editor.as_ref().is_some_and(|editor| {
+                let live = editor.read(cx).live_text(cx);
+                self.key_string_loaded.as_deref() != Some(live.as_str())
+            });
         let save_enabled = editable
-            && (self.key_string_dirty
+            && (string_dirty
+                || self.key_string_dirty
                 || self.cell_editor.is_some()
                 || !self.state.edits.is_empty()
                 || !self.inserts.is_empty());
@@ -198,11 +206,7 @@ impl GridView {
                 save_enabled,
                 theme,
                 cx.listener(|this, _event, _window, cx| {
-                    if this.is_string_key_page() {
-                        this.save_string_key(cx);
-                    } else {
-                        this.save_grid(cx);
-                    }
+                    this.save_current(cx);
                 }),
             ));
         }
@@ -317,7 +321,21 @@ impl GridView {
             .and_then(|value| serde_json::to_string_pretty(&value).ok());
         let json_mode = self.key_string_format == KeyStringFormat::Json && pretty.is_some();
 
-        let mut page = div().flex().flex_col().size_full();
+        let mut page = div()
+            .flex()
+            .flex_col()
+            .size_full()
+            // Ctrl/⌘+S must reach the key page even while the RAW editor owns focus.
+            .capture_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+                let keystroke = &event.keystroke;
+                if (keystroke.modifiers.control || keystroke.modifiers.platform)
+                    && keystroke.key.eq_ignore_ascii_case("s")
+                    && this.key_page_kind() == Some("string")
+                {
+                    cx.stop_propagation();
+                    this.save_string_key(cx);
+                }
+            }));
         page = page.child(self.render_key_page_bar(theme, cx));
 
         let format_button = |id: &'static str, label: &'static str, active: bool| {
@@ -415,7 +433,10 @@ impl GridView {
             {
                 if self.key_json_editor.is_none() {
                     let options = ui::SqlEditorOptions {
-                        language: "text".into(),
+                        // The JSON grammar is compiled into gpui-kit (tree-sitter-json ships with
+                        // the SQL grammar), so the read-only view gets real syntax colours
+                        // instead of a plain text run.
+                        language: "json".into(),
                         font_size: 13.0,
                         line_number: false,
                         readonly: true,
@@ -519,13 +540,30 @@ impl GridView {
         }
     }
 
+    /// Save whatever the key page currently shows: the RAW text for a string key, or the
+    /// field/member edits for a collection.
+    pub(super) fn save_current(&mut self, cx: &mut Context<'_, Self>) {
+        if self.is_string_key_page() {
+            self.save_string_key(cx);
+        } else {
+            self.save_grid(cx);
+        }
+    }
+
     /// Save the string page's RAW text through the driver's string write path, then reload the key.
     pub(super) fn save_string_key(&mut self, cx: &mut Context<'_, Self>) {
         if self.key_page_kind() != Some("string") || !self.state.editable || self.key_string_saving
         {
             return;
         }
-        let text = self.key_string_text.clone();
+        // Read the editor's live text rather than the mirror: a click on 保存修改 can land before
+        // the last change callback reaches the page, and that made the button look inert.
+        let text = self
+            .key_string_editor
+            .as_ref()
+            .map(|editor| editor.read(cx).live_text(cx))
+            .unwrap_or_else(|| self.key_string_text.clone());
+        self.key_string_text = text.clone();
         let connection = self.state.connection.clone();
         let database = self.state.database.clone();
         let key = self.state.table.clone();
@@ -554,6 +592,7 @@ impl GridView {
                     Ok(Ok(())) => {
                         grid.key_string_dirty = false;
                         grid.key_string_loaded = None;
+                        grid.show_toast(ToastKind::Success, t!("redis.key.saved").to_string(), cx);
                         grid.reload_after_write(cx);
                     }
                     Ok(Err(error)) => grid.key_string_error = Some(error.to_string()),

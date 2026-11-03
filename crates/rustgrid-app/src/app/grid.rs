@@ -296,6 +296,16 @@ impl GridView {
         }
     }
 
+    /// Drop the current cell/row selection. The info pane shows the table's details again
+    /// instead of the selected row's form.
+    pub(super) fn clear_selection(&mut self, cx: &mut Context<'_, Self>) {
+        if self.state.selection.take().is_some() {
+            self.cell_press = None;
+            self.selecting_cells = false;
+            cx.notify();
+        }
+    }
+
     /// Append a blank insert row (the "+" button), select its first cell and reveal it.
     pub(super) fn add_insert_row(&mut self, window: &mut Window, cx: &mut Context<'_, Self>) {
         if !self.state.editable || self.state.loading || self.state.columns.is_empty() {
@@ -459,11 +469,13 @@ impl GridView {
         .detach();
     }
 
-    /// Put the grid back at the top-left. Used when the row set changes identity (page turn,
+    /// Put the grid's rows back at the top. Used when the row set changes identity (page turn,
     /// sort/filter); `reload_after_write` skips it so a write or refresh does not jump the view.
+    /// The horizontal position is deliberately kept: sorting or filtering reuses the same
+    /// columns, and snapping them back to the first column made the user lose the width they
+    /// had scrolled to. The handle clamps the offset itself when a new column set is narrower.
     fn reset_scroll(&mut self) {
         self.list_scroll = UniformListScrollHandle::new();
-        self.hscroll.set_offset(Point::default());
     }
 
     fn reload_query(&mut self, reset_scroll: bool, cx: &mut Context<'_, Self>) {
